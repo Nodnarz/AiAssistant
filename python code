@@ -1,0 +1,55 @@
+import openai
+import speech_recognition as sr
+from gtts import gTTS
+import os
+import time
+
+openai_api_key = 'APY_KEY_HERE'
+openai.api_key = openai_api_key
+
+#Initialize recognizer
+r = sr.Recognizer()
+
+#Define your wake word and stop command
+wake_word = "hey assistant"
+stop_command = "stop listening"
+
+print("Waiting for wake word...")
+
+#Keep listening for the wake word
+with sr.Microphone() as source:
+    r.adjust_for_ambient_noise(source, duration=1)
+while True:
+        audio_data = r.listen(source)
+        try:
+            # Recognize the speech
+            text = r.recognize_google(audio_data).lower()
+
+            if wake_word in text:
+                command_text = text.replace(wake_word, "").strip()  # remove wake word
+                print("Heard command: ", command_text)
+
+                if stop_command in command_text:
+                    print("Stop command detected, going back to waiting for the wake word.")
+                    continue
+
+                # send the command text to GPT
+                gpt_response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": command_text}
+                    ]
+                )
+
+                response_text = gpt_response.choices[0]['message']['content'].strip()
+
+                # Create the TTS response from GPT's response
+                tts = gTTS(text=response_text, lang='en')
+                tts.save("response.mp3")
+                os.system("mpg321 response.mp3")
+                time.sleep(1.5)  # Delay for 1.5 seconds after response
+
+        except sr.UnknownValueError:
+            # In case the speech was not understood
+            print("Sorry, I didn't get that.")
